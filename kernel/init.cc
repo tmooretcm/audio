@@ -15,7 +15,6 @@
 #include "stdint.h"
 #include "tss.h"
 #include "sys.h"
-#include "pci.h"
 
 struct Stack {
     static constexpr int BYTES = 4096;
@@ -144,7 +143,6 @@ extern "C" void kernelInit(void) {
     // Initialize the PIT
     Pit::init();
 
-    PCI::pci_init();
 
     auto id = SMP::me();
 

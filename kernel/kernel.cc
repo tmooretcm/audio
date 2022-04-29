@@ -5,6 +5,7 @@
 #include "machine.h"
 #include "libk.h"
 #include "config.h"
+#include "pci.h"
 
 Shared<Node> checkFile(const char* name, Shared<Node> node) {
     // CHECK(node != nullptr);
@@ -32,6 +33,7 @@ Shared<Node> getDir(Shared<Ext2> fs, Shared<Node> node, const char* name) {
 Shared<Ext2> fs;
 
 void kernelMain(void) {
+    PCI::pci_init();
     auto d = Shared<Ide>::make(1);
     Debug::printf("mounting drive 1\n");
     fs = Shared<Ext2>::make(d);
