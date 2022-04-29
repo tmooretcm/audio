@@ -18,14 +18,14 @@ namespace PCI {
     typedef struct pci_device {
         uint32_t vendor;
         uint32_t device;
-        uint32_t function; 
+        uint32_t func; 
         struct pci_driver* driver;
     } pci_device;
 
     typedef struct device_id {
         uint32_t vendor_id;
         uint32_t device_id;
-        uint32_t function_id;
+        uint32_t func_id;
     } device_id;
 
     typedef struct pci_driver {
@@ -38,7 +38,7 @@ namespace PCI {
 
     extern void pci_init();
 
-    extern void pci_debug(uint8_t* buf);
+    extern void pci_debug();
 
 }
 
