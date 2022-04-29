@@ -94,5 +94,6 @@ namespace PCI {
         pci_drivers = new pci_driver*[32];
         parse_devices();
         Debug::printf("PCI Initialized.\n");
+        pci_debug();
     }
 }
