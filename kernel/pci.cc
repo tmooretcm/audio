@@ -41,6 +41,7 @@ namespace PCI {
     };
 
     void init() {
+        // audio makes me sad
     } 
     
     uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
