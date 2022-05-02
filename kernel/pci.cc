@@ -1,5 +1,7 @@
 #include "pci.h"
 
+// big help & reference: https://github.com/levex/osdev/blob/master/drivers/pci/pci.c
+
 namespace PCI {
 
     pci_device** pci_devices;
@@ -45,14 +47,6 @@ namespace PCI {
         return pci_config_read_word(bus, slot, func, 2);
     }
 
-    inline uint16_t get_class_id(uint16_t bus, uint16_t slot, uint16_t func) {
-        return (pci_config_read_word(bus, slot, func, 0xA) & ~0x00FF) >> 8;
-    }
-
-    inline uint16_t get_subclass_id(uint16_t bus, uint16_t slot, uint16_t func) {
-        return (pci_config_read_word(bus, slot, func, 0xA) & ~0x00FF);
-    }
-
     // from the PCI spec - http://www.cisl.columbia.edu/courses/spring-2004/ee4340/restricted_handouts/pci_23.pdf
     void parse_devices() {
         for (uint32_t bus = 0; bus < 256; bus++) {
@@ -93,7 +87,7 @@ namespace PCI {
         pci_devices = new pci_device*[32];
         pci_drivers = new pci_driver*[32];
         parse_devices();
-        Debug::printf("PCI Initialized.\n");
+        // Debug::printf("PCI Initialized.\n");
         pci_debug();
     }
 }
