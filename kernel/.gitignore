@@ -1,1 +1,8 @@
 build/
+*.time
+*.failure
+*.raw
+*.out
+*.result
+*.diff
+*.data
