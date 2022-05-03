@@ -3,7 +3,7 @@
 
 #include "pci.h"
 
-namespace Audio {
+namespace audio {
 
     typedef struct alf {
         uint32_t addr;
@@ -11,7 +11,7 @@ namespace Audio {
         uint32_t flags;
     } alf;
 
-    typedef struct AudioStream {
+    typedef struct audio_stream {
         // registers
         uint32_t CTL;
         uint32_t LPIB;
@@ -25,9 +25,9 @@ namespace Audio {
         alf* alf;
         uint32_t alf_entries;
         uint32_t alfsize; alfe; alfp;
-    } AudioStream;
+    } audio_stream;
 
-    typedef struct AudioState {
+    typedef struct audio_state {
 
         PCI::pci_device* pci;
         char* name;
@@ -71,9 +71,9 @@ namespace Audio {
         uint32_t DPLBASE; // dma position lower base address
         uint32_t DPUBASE; // dma position upper base address
 
-        AudioStream streams[8];
+        audio_stream streams[8];
 
-    } AudioState;
+    } audio_state;
 
 }
 

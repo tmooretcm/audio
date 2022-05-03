@@ -1,7 +1,7 @@
 #include "audio.h"
 
 // update interrupt status
-static void update_int_sts(AudioState* state) {
+static void update_int_sts(audio_state* state) {
     uint32_t status = 0;
 
     if (state->RIRBSTS & (1 << 0)) {
@@ -27,7 +27,7 @@ static void update_int_sts(AudioState* state) {
     state->INTSTS = status;
 }
 
-static int send_command(AudioState state, uint32_t verb) {
+static int send_command(audio_state* state, uint32_t verb) {
     uint32_t codec_addr; nid; data;
     return 0;
 }
