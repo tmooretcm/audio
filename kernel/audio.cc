@@ -55,3 +55,35 @@ static void init_corb(hda_audio_device* device) {
     // start DMA
     REG_OUTB(device, REG_CORBCTL, 0x02);
 }
+
+static void init_rirb(hda_audio_device* device) {
+    uint8_t reg;
+    uint32_t rirb_base_addr;
+
+    reg = REG_INB(device, REG_RIRBSIZE);
+
+    if (reg & (1 << 6)) {
+        device->rirb_entries = 256;
+        reg |= 0x2;
+    } else if (reg & (1 << 5)) {
+        device->rirb_entries = 16;
+        reg |= 0x1;
+    } else if (reg & (1 << 4)) {
+        device->rirb_entries = 2;
+        reg |= 0x0;
+    } else {
+        Debug::printf("No supported RIRB sizes.\n");
+    }
+
+    REG_OUTB(device, REG_RIRBSIZE, reg);
+
+    rirb_base_addr = (uintptr_t)device->rings->pa[0] + 1024; // should be pa[256] (?)
+    REG_OUTL(device, REG_RIRBLBASE, rirb_base_addr & 0xffffffff);
+    REG_OUTL(device, REG_RIRBUBASE, rirb_base_addr >> 32);
+
+    // set interrupt cnt register
+    REG_OUTB(device, REG_RINTCNT, 0x42);
+
+    // start DMA
+    REG_OUTB(device, REG_RIRBCTL, 0x02);
+}
