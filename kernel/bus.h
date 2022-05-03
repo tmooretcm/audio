@@ -3,9 +3,13 @@
 
 #include "stdint.h"
 
+struct device_state;
+
 typedef struct bus_state {
+    device_state* parent_device {};
     char* name;
     int max_index;
+    int size;
     bool init;
     bool full;
     int num_children;
@@ -15,7 +19,8 @@ typedef struct device_state {
     char* name;
     char* path;
     bool init;
-    bus_state* parent_bus;
+    int num_child_bus;
+    bus_state* parent_bus {};
 } device_state;
 
 struct codec_device;
@@ -24,14 +29,14 @@ typedef void (*codec_response_function)(codec_device* device, bool solicited, ui
 typedef bool (*codec_transfer_function)(codec_device* device, uint32_t start_node, bool output, uint8_t* buffer, uint32_t length);
 
 typedef struct codec_bus {
-    bus_state* bus;
+    bus_state* bus_st {};
     uint32_t next_codec_address;
     codec_response_function response;
     codec_transfer_function transfer;
 } codec_bus;
 
 typedef struct codec_device {
-    device_state* device;
+    device_state* device {};
     uint32_t codec_address;
 
     int (*device_init)(codec_device* device);
