@@ -2,6 +2,7 @@
 #define _audio_h_
 
 #include "pci.h"
+#include "bus.h"
 
 namespace audio {
 
@@ -31,7 +32,7 @@ namespace audio {
 
         PCI::pci_device* pci;
         char* name;
-        // codecs here? how to make codec struct
+        codec_bus* codecs;
 
         // registers
         uint32_t GCAP; // global capabilities

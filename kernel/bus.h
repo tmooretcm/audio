@@ -2,8 +2,18 @@
 #define _bus_h_
 
 #include "stdint.h"
+#include "queue.h"
+#include "atomic.h"
+#include "blocking_lock.h"
 
 struct device_state;
+
+typedef struct bus_child {
+    device_state* child_device;
+    int index;
+    bus_child* next;
+    Queue<bus_child, BlockingLock> siblings{};
+} bus_child;
 
 typedef struct bus_state {
     device_state* parent_device {};
@@ -13,6 +23,10 @@ typedef struct bus_state {
     bool init;
     bool full;
     int num_children;
+
+    bus_state* next;
+    Queue<bus_child, BlockingLock> children{};
+    Queue<bus_state, BlockingLock> siblings{};
 } bus_state;
 
 typedef struct device_state {
@@ -20,7 +34,9 @@ typedef struct device_state {
     char* path;
     bool init;
     int num_child_bus;
+    uint32_t codec_address;
     bus_state* parent_bus {};
+    Queue<bus_child, BlockingLock> child_bus{};
 } device_state;
 
 struct codec_device;

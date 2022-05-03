@@ -14,8 +14,21 @@ void codec_bus_init(device_state* device, codec_bus* bus, uint32_t bus_size, cod
 }
 
 codec_device* codec_find(codec_bus* bus, uint32_t codec_address) {
-    // idk how to do this
-    return nullptr;
+    bus_child* child;
+    codec_device* ret = nullptr;
+    bool found = false;
+    // could loop infinitely
+    while (!found) {
+        child = bus->bus_st->children.remove();
+        device_state* dev = child->child_device;
+        if (dev->codec_address == codec_address) {
+            ret->device = dev;
+            found = true;
+        } else {
+            bus->bus_st->children.add(child);
+        }
+    }
+    return ret;
 }
 
 void codec_response(codec_device* device, bool solicited, uint32_t response) {
@@ -32,3 +45,4 @@ bool codec_transfer(codec_device* device, uint32_t start_node, bool output, uint
     bus->bus_st->parent_device = device->device;
     return bus->transfer(device, start_node, output, buffer, length);
 }
+

@@ -28,6 +28,11 @@ static void update_int_sts(audio_state* state) {
 }
 
 static int send_command(audio_state* state, uint32_t verb) {
-    uint32_t codec_addr; nid; data;
+    uint32_t codec_addr, nid, data;
+    codec_device* codec;
+
+    codec_addr = (verb >> 28) & 0x0F;
+    nid = (verb >> 20) & 0x7F;
+    data = verb & 0xFFFFF;
     return 0;
 }
