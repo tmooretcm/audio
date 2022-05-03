@@ -1,50 +1,28 @@
 #include "pci.h"
 
+// big help & reference: https://github.com/levex/osdev/blob/master/drivers/pci/pci.c
+
 namespace PCI {
 
-    #define BAR0 0x10
-    #define BAR1 0x14
-    #define BAR2 0x18
-    #define BAR3 0x1C
-    #define BAR4 0x20
-    #define BAR5 0x24
+    pci_device** pci_devices;
+    uint32_t devices;
 
-    struct PCIDevice {
-        uint16_t vendor_id;
-        uint16_t device_id;
-        uint16_t command;
-        uint16_t status;
-        uint8_t rev_id;
-        uint8_t prog_if;
-        uint8_t subclass;
-        uint8_t class_code;
-        uint8_t cache_line_size;
-        uint8_t latency_timer;
-        uint8_t header_type;
-        uint8_t bist;
-        uint32_t bar0;
-        uint32_t bar1;
-        uint32_t bar2;
-        uint32_t bar3;
-        uint32_t bar4;
-        uint32_t bar5;
-        uint32_t cardbus_cis_pointer;
-        uint16_t subsystem_vendor_id;
-        uint16_t subsystem_id;
-        uint32_t expansion_rom_base;
-        uint8_t capabilities;
-        char* reserved[56];
-        uint8_t int_line;
-        uint8_t int_pin;
-        uint8_t min_grant;
-        uint8_t max_latency;
-    };
+    pci_driver** pci_drivers;
+    uint32_t drivers;
 
-    void init() {
-        // audio makes me sad
-    } 
+    void add_device(pci_device* device) {
+        pci_devices[devices] = device;
+        devices++;
+        // testing
+    }
+
+    void add_driver(pci_driver* driver) {
+        pci_drivers[drivers] = driver;
+        drivers++;
+    }
     
-    uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
+    // this is straight from osdev
+    uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
         uint32_t address;
         uint32_t lbus  = (uint32_t)bus;
         uint32_t lslot = (uint32_t)slot;
@@ -62,12 +40,55 @@ namespace PCI {
         return tmp;
     }
 
-    uint16_t pciCheckVendor(uint8_t bus, uint8_t slot) {
-        uint16_t vendor, device;
-        /* Try and read the first configuration register. Since there are no
-        * vendors that == 0xFFFF, it must be a non-existent device. */
-        if ((vendor = pciConfigReadWord(bus, slot, 0, 0)) != 0xFFFF) {
-            device = pciConfigReadWord(bus, slot, 0, 2);
-        } return (vendor);
+    inline uint16_t get_vendor_id(uint16_t bus, uint16_t slot, uint16_t func) {
+        return pci_config_read_word(bus, slot, func, 0);
+    }
+
+    inline uint16_t get_device_id(uint16_t bus, uint16_t slot, uint16_t func) {
+        return pci_config_read_word(bus, slot, func, 2);
+    }
+
+    // from the PCI spec - http://www.cisl.columbia.edu/courses/spring-2004/ee4340/restricted_handouts/pci_23.pdf
+    void parse_devices() {
+        for (uint32_t bus = 0; bus < 256; bus++) {
+            for (uint32_t slot = 0; slot < 32; slot++) {
+                for (uint32_t func = 0; func < 8; func++) {
+                    uint16_t vendor_id = get_vendor_id(bus, slot, func);
+                    if (vendor_id == 0xFFFF) {
+                        // invalid vendor id, go next
+                        continue;
+                    }
+                    uint16_t device_id = get_device_id(bus, slot, func);
+                    // Debug::printf("vendor: 0x%x device: 0x%x\n", vendor, device);
+                    pci_device* device = new pci_device();
+                    device->vendor = vendor_id;
+                    device->device = device_id;
+                    device->func = func;
+                    device->driver = nullptr;
+                    add_device(device);
+                }
+            }
+        }
+    }
+
+    void pci_debug() {
+        for (uint32_t i = 0; i < devices; i++) {
+            pci_device* device = pci_devices[i];
+            if (device->driver) {
+                // shouldn't need to do anyhting in here for now
+            } else {
+                Debug::printf("PCI DUMP: vendor: %x, device: %x, function: %x\n", device->vendor, device->device, device->func);
+            }
+        }
+    }
+
+    void pci_init() {
+        devices = 0;
+        drivers = 0;
+        pci_devices = new pci_device*[32];
+        pci_drivers = new pci_driver*[32];
+        parse_devices();
+        // Debug::printf("PCI Initialized.\n");
+        pci_debug();
     }
 }

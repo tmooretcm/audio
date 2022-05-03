@@ -1,5 +1,4 @@
 #include "init.h"
-
 #include "debug.h"
 #include "config.h"
 #include "u8250.h"
@@ -143,6 +142,7 @@ extern "C" void kernelInit(void) {
 
     // Initialize the PIT
     Pit::init();
+
 
     auto id = SMP::me();
 
