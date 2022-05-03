@@ -13,9 +13,6 @@ namespace PCI {
     void add_device(pci_device* device) {
         pci_devices[devices] = device;
         devices++;
-        // testing
-        // burh
-        // bruhhhh
     }
 
     void add_driver(pci_driver* driver) {
