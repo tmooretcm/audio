@@ -1,6 +1,8 @@
 #ifndef _bus_h_
 #define _bus_h_
 
+#include "stdint.h"
+
 typedef struct bus_state {
     char* name;
     int max_index;
@@ -16,7 +18,7 @@ typedef struct device_state {
     bus_state* parent_bus;
 } device_state;
 
-typedef struct codec_device;
+struct codec_device;
 
 typedef void (*codec_response_function)(codec_device* device, bool solicited, uint32_t response);
 typedef bool (*codec_transfer_function)(codec_device* device, uint32_t start_node, bool output, uint8_t* buffer, uint32_t length);

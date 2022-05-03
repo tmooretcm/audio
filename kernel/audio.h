@@ -22,9 +22,9 @@ namespace audio {
         uint32_t BDLP_rbase;
 
         // keeping track of alf state.
-        alf* alf;
+        alf* alf_state;
         uint32_t alf_entries;
-        uint32_t alfsize; alfe; alfp;
+        uint32_t alfsize, alfe, alfp;
     } audio_stream;
 
     typedef struct audio_state {
