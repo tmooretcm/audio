@@ -1,38 +1,57 @@
 #include "audio.h"
+#include "debug.h"
+
+static audio_driver* driver;
 
 // update interrupt status
-static void update_int_sts(audio_state* state) {
-    uint32_t status = 0;
+using namespace audio;
 
-    if (state->RIRBSTS & (1 << 0)) {
-        status |= (1 << 30);
-    }
-    if (state->RIRBSTS & (1 << 2)) {
-        status |= (1 << 30);
-    }
-    if (state->STATESTS & state->WAKEEN) {
-        status |= (1 << 30);
-    }
+static void handle_interrupt(hda_audio_device* device) {
+    // Grab current values
+    uint32_t curr_int_sts = REG_INL(device, REG_INTSTS);
+    uint8_t curr_out_sts = REG_INB(device, REG_O0_STS);
 
-    for (int i = 0; i < 8; i++) {
-        if (state->streams[i].CTL & (1 << 26)) {
-            status |= (1 << i);
-        }
+    Debug::printf("Handling interrupt: intsts: %x, outsts: %x, num bufs completed: %d\n", curr_int_sts, curr_out_sts, device->num_buffs_completed);
+
+    // Interrupt for stream 1 = buffer finished
+    if (curr_out_sts & 0x4) {
+        audio_buffer_complete(device->output->stream, device->num_buffs_completed);
+        device->num_buffs_completed++;
+        device->num_buffs_completed %= BDL_SIZE;
     }
 
-    if (status & state->INTCTL) {
-        status |= (1U << 31);
-    }
-
-    state->INTSTS = status;
+    // Reset values
+    REG_OUTL(device, REG_INTSTS, curr_int_sts);
+    REG_OUTB(device, REG_O0_STS, curr_out_sts);
 }
 
-static int send_command(audio_state* state, uint32_t verb) {
-    uint32_t codec_addr, nid, data;
-    codec_device* codec;
+static void init_corb(hda_audio_device* device) {
+    uint8_t reg;
+    uint32_t corb_base_addr;
 
-    codec_addr = (verb >> 28) & 0x0F;
-    nid = (verb >> 20) & 0x7F;
-    data = verb & 0xFFFFF;
-    return 0;
+    reg = REG_INB(device, REG_CORBSIZE);
+
+    // checking corb sizes
+    if (reg & (1 << 6)) {
+        device->corb_entries = 256;
+        reg |= 0x2;
+    } else if (reg & (1 << 5)) {
+        device->corb_entries = 16;
+        reg |= 0x1;
+    } else if (reg & (1 << 4)) {
+        device->corb_entries = 2;
+        reg |= 0x0;
+    } else {
+        Debug::printf("No supported CORB sizes.\n");
+    }
+
+    REG_OUTB(device, REG_CORBSIZE, reg);
+
+    // initialize corb base address
+    corb_base_addr = (uintptr_t)device->rings->pa[0];
+    REG_OUTL(device, REG_CORBLBASE, corb_base_addr & 0xffffffff);
+    REG_OUTL(device, REG_CORBUBASE, corb_base_addr >> 32);
+
+    // start DMA
+    REG_OUTB(device, REG_CORBCTL, 0x02);
 }
