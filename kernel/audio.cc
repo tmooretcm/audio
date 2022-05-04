@@ -108,3 +108,19 @@ static void corb_write(hda_audio_device* device, uint32_t verb) {
     device->corb[next] = verb;
     REG_OUTW(device, REG_CORBWP, next);
 }
+
+static void rirb_read(hda_audio_device* device, uint64_t* read){
+    uint16_t write_pointer;
+    uint16_t read_pointer = device->rirb_rp;
+
+    do {
+        write_pointer = REG_INW(device, REG_RIRBWP) & 0xFF;
+    } while (write_pointer == read_pointer);
+
+    read_pointer = (read_pointer + 1) % device->rirb_entries;
+    device->rirb_rp = read_pointer;
+    *read = device->rirb[read_pointer];
+    REG_OUTB(device, REG_RIRBSTS, 0x5);
+
+
+}
