@@ -131,7 +131,6 @@ static void rirb_read(hda_audio_device* device, uint64_t* read){
     REG_OUTB(device, REG_RIRBSTS, 0x5);
 }
 
-
 // Facilitates communication between corb and rirb. codex, widget, and payload
 // parameters define the communication. Using these instructions, write to corb, then
 // read from rirb and return the response.
@@ -166,7 +165,7 @@ static void init_output_widget(hda_audio_device* device){
     device->output->stream->device = device->audio;
     device->output->stream->num_buffers = BDL_SIZE;
     device->output->stream->buffer_size = BUFFER_SIZE / 2;
-    //device->output->stream->sample_format = CDI_AUDIO_16SI; have no idea where this is from
+    device->output->stream->sample_format = AUDIO_16SI;
 
 
     codec_transmission(device, device->output->codec, device->output->node_id, VERB_SET_STREAM_CHANNEL | 0x10);
@@ -175,3 +174,109 @@ static void init_output_widget(hda_audio_device* device){
     device->output->num_channels = 2;
     output_widget_config(device);
 }
+
+// Debug tool to see what widgets are connected to the audio device.
+static void debug_widget_connections(hda_audio_device* device, int codec, int node_id) {
+    uint32_t num_connections = codec_transmission(device, codec, node_id, VERB_GET_PARAMETER | PARAM_CONN_LIST_LEN);
+    if (num_connections == 0) {
+        return;
+    }
+    uint32_t selected_connection;
+    for (int i = 0; i < (num_connections & 0x7F); i++) {
+        uint32_t current_connection;
+        int index, shift;
+        if (num_connections & 0x80) {
+            index = i & ~3;
+            shift = 8 * (i & 3);
+        } else {
+            index = i & ~1;
+            shift = 8 * (i & 1);
+        }
+        current_connection = codec_transmission(device, codec, node_id, VERB_GET_CONN_LIST | index);
+        current_connection >>= shift;
+
+        bool range;
+        if (num_connections & 0x80) {
+            range = current_connection & 0x8000;
+            current_connection &= 0x7FFF;
+        } else {
+            range = current_connection & 0x80;
+            current_connection &= 0x7F;
+        }
+
+        Debug::printf("Widget Connection: %c%d\n", range ? '-' : ' ', current_connection);
+    }
+
+    selected_connection = codec_transmission(device, codec, node_id, VERB_GET_CONN_SELECT);
+    Debug::printf("Currently selected widget: %d\n", selected_connection);
+}
+
+// start setting up afg codec and widgets
+static void init_widget(hda_audio_device* device, int codec, int node_id) {
+    uint32_t widget_capability, amp_capability, eapd_capability;
+    WIDGET_TYPE type;
+
+    widget_capability = codec_transmission(device, codec, node_id, VERB_GET_PARAMETER | PARAM_AUDIO_WID_CAP);
+    // not ready to initialize
+    if (widget_capability == 0) {
+        return;
+    }
+    type = (WIDGET_TYPE)((widget_capability & WIDGET_CAP_TYPE_MASK) >> WIDGET_CAP_TYPE_SHIFT);
+    amp_capability = codec_transmission(device, codec, node_id, VERB_GET_PARAMETER | PARAM_OUT_AMP_CAP);
+    eapd_capability = codec_transmission(device, codec, node_id, VERB_GET_EAPD_BTL);
+
+    char* widget_name;
+    switch (type) {
+        case 0: widget_name = "WIDGET: Output"; break;
+        case 1: widget_name = "WIDGET: Input"; break;
+        case 2: widget_name = "WIDGET: Mixer"; break;
+        case 3: widget_name = "WIDGET: Selector"; break;
+        case 4: widget_name = "WIDGET: Pin Complex"; break;
+        case 5: widget_name = "WIDGET: Power"; break;
+        case 6: widget_name = "WIDGET: Volume"; break;
+        case 7: widget_name = "WIDGET: Beep"; break;
+        case 15: widget_name = "WIDGET: Vendor"; break;
+        default: widget_name = "WIDGET: Unknown"; break;
+    }
+
+    uint32_t gain = codec_transmission(device, codec, node_id, VERB_GET_AMP_GAIN_MUTE | 0x8000) << 8;
+    gain |= codec_transmission(device, codec, node_id, VERB_GET_AMP_GAIN_MUTE | 0xA000);
+
+    // debug statements; can comment out these two lines
+    Debug::printf("INIT WIDGET  Widget type: %s; Node_ID: %d; WidgetCap: %x, EAPDCap: %x, Amp: %x/%x\n", 
+                widget_name, node_id, widget_capability, eapd_capability, gain, amp_capability);
+    debug_widget_connections(device, codec, node_id);
+
+    // actually setting widget registers
+    switch (type) {
+        case WIDGET_OUTPUT:
+        {
+            if (!device->output->node_id) {
+                device->output->codec = codec;
+                device->output->node_id = node_id;
+                device->output->amp_gain = (amp_capability >> 8) & 0x7F;
+            }
+            codec_transmission(device, codec, node_id, VERB_SET_EAPD_BTL | eapd_capability | 0x2);
+            break;
+        }
+        case WIDGET_PIN:
+        {
+            uint32_t pin_capability, control;
+            pin_capability = codec_transmission(device, codec, node_id, VERB_GET_PARAMETER | PARAM_PIN_CAP);
+            if ((pin_capability & PIN_CAP_OUTPUT) == 0) {
+                return;
+            }
+            control = codec_transmission(device, codec, node_id, VERB_GET_PIN_CONTROL) | PIN_CTL_ENABLE_OUTPUT;
+            codec_transmission(device, codec, node_id, VERB_SET_PIN_CONTROL | control);
+            codec_transmission(device, codec, node_id, VERB_SET_EAPD_BTL | eapd_capability | 0x2);
+            break;
+        }
+        default: return;
+    }
+
+    // enable power control
+    if (widget_capability & WIDGET_CAP_POWER_CNTRL) {
+        codec_transmission(device, codec, node_id, VERB_SET_POWER_STATE | 0x0);
+    }
+}
+
