@@ -109,6 +109,9 @@ static void corb_write(hda_audio_device* device, uint32_t verb) {
     REG_OUTW(device, REG_CORBWP, next);
 }
 
+// Waits for an available RIRB entry to read from.
+// When an entry is found, increments rirb's read pointer,
+// and reads entry into *read.
 static void rirb_read(hda_audio_device* device, uint64_t* read){
     uint16_t write_pointer;
     // last accessed read_pointer read from RIRB
@@ -128,6 +131,10 @@ static void rirb_read(hda_audio_device* device, uint64_t* read){
     REG_OUTB(device, REG_RIRBSTS, 0x5);
 }
 
+
+// Facilitates communication between corb and rirb. codex, widget, and payload
+// parameters define the communication. Using these instructions, write to corb, then
+// read from rirb and return the response.
 static uint32_t codec_transmission(hda_audio_device* device, int codec, int widget_id, uint32_t payload){
     uint64_t read;
     // Generate corb input with codec, widget id, and payload
@@ -141,4 +148,30 @@ static uint32_t codec_transmission(hda_audio_device* device, int codec, int widg
     rirb_read(device, &read);
 
     return read & 0xffffffff;
+}
+
+
+static void output_widget_config(hda_audio_device* device){
+    uint16_t format = BITS_16 | device->output->sample_rate |
+                      (device->output->num_channels - 1);
+
+    codec_transmission(device, device->output->codec, device->output->node_id,
+        VERB_SET_FORMAT | format);
+
+    REG_OUTL(device, REG_O0_FMT, format);
+
+}
+
+static void init_output_widget(hda_audio_device* device){
+    device->output->stream->device = device->audio;
+    device->output->stream->num_buffers = BDL_SIZE;
+    device->output->stream->buffer_size = BUFFER_SIZE / 2;
+    //device->output->stream->sample_format = CDI_AUDIO_16SI; have no idea where this is from
+
+
+    codec_transmission(device, device->output->codec, device->output->node_id, VERB_SET_STREAM_CHANNEL | 0x10);
+
+    device->output->sample_rate = SR_48_KHZ;
+    device->output->num_channels = 2;
+    output_widget_config(device);
 }
