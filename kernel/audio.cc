@@ -1,12 +1,15 @@
 #include "audio.h"
 #include "debug.h"
 
+static audio_driver* driver;
+
 // update interrupt status
 using namespace audio;
 
-
 // Handles any interrupts - not technically needed to implement audio but since we have interrupts enabled we must have this
+static void handle_interrupt(hda_audio_device* device) {
     // Grab current values
+    uint32_t curr_int_sts = REG_INL(device, REG_INTSTS);
     uint8_t curr_out_sts = REG_INB(device, REG_O0_STS);
 
     Debug::printf("Handling interrupt: intsts: %x, outsts: %x, num bufs completed: %d\n", curr_int_sts, curr_out_sts, device->num_buffs_completed);
@@ -23,11 +26,11 @@ using namespace audio;
     REG_OUTB(device, REG_O0_STS, curr_out_sts);
 }
 
+// Initialize the CORB data structure
 static void init_corb(hda_audio_device* device) {
     uint8_t reg;
     uint32_t corb_base_addr;
 
-    // read byte from corb register
     reg = REG_INB(device, REG_CORBSIZE);
 
     // checking corb sizes
@@ -44,7 +47,6 @@ static void init_corb(hda_audio_device* device) {
         Debug::printf("No supported CORB sizes.\n");
     }
 
-    // place reg byte into register
     REG_OUTB(device, REG_CORBSIZE, reg);
 
     // initialize corb base address
@@ -61,10 +63,8 @@ static void init_rirb(hda_audio_device* device) {
     uint8_t reg;
     uint32_t rirb_base_addr;
 
-    // read byte from rirb register
     reg = REG_INB(device, REG_RIRBSIZE);
 
-    // checking rirb sizes
     if (reg & (1 << 6)) {
         device->rirb_entries = 256;
         reg |= 0x2;
@@ -78,11 +78,8 @@ static void init_rirb(hda_audio_device* device) {
         Debug::printf("No supported RIRB sizes.\n");
     }
 
-    // place reg byte into register
     REG_OUTB(device, REG_RIRBSIZE, reg);
 
-
-    // initialize rirb base addreses
     rirb_base_addr = (uintptr_t)device->rings->pa[0] + 1024; // should be pa[256] (?)
     REG_OUTL(device, REG_RIRBLBASE, rirb_base_addr & 0xFFFFFFFF);
     REG_OUTL(device, REG_RIRBUBASE, rirb_base_addr >> 32);
