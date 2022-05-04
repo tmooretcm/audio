@@ -341,6 +341,36 @@ static void audio_reset(hda_audio_device* device) {
     audio_init_codec(device);
 }
 
+static void stream_descriptor_init(hda_audio_device* device) {
+    uint32_t bld_b, dma_pos;
+    int i;
+
+    //set reg for ouput 
+    REG_OUTB(device, REG_O0_CTLU, 0x10);
+    REG_OUTL(device, REG_O0_CBL, BDL_SIZE * BUFFER_SIZE);
+    REG_OUTW(device, REG_O0_STLVI, BDL_SIZE -1);
+
+    // Set buffer list 
+    bdl_b = (uintptr_t) device->rings->pa[0] + 3072;
+    REG_OUTL(device, REG_O0_BDLPL, bdl_b & 0xFFFFFFFF);
+    REG_OUTL(device, REG_O0_BDLPU, bld_b >> 32);
+
+    for(i = 0; i < BDL_SIZE; i++) {
+        device->bdl[i].addr = device->completed_buffers->pa[0] + (i * BUFFER_SIZE);
+        device->bdl[i]->length = BUFFER_SIZE;
+        device->bdl[i]->flags = 1;
+    }
+    memset(device->completed_buffers->va, 0, BDL_SIZE * BUFFER_SIZE);
+
+    // init DMA pos in buffer
+    for(i = 0; i < 8; i++) {
+        device->dma_pos[i] = 0;
+    }
+
+    dma_pos = (uintptr_t) device->rings->pa[0] + 3072 + ROUNDED_BDL_BYTES;
+    REG_OUTL(device, REG_DPLBASE, (dma_pos & 0xffffffff) | 0x1); // marked as TODO needs another look
+    REG_OUTL(device, REG_DPUBASE, dma_pos >> 32);
+}
 
 
 
