@@ -103,23 +103,6 @@ namespace audio {
         audio_sample_format sample_format;
     } audio_stream;
 
-    typedef struct audio_driver {
-        PCI::pci_driver* driver;
-        
-        // sends or receives data to/from a device's buffer; returns 0 on success, -1 on error
-        int (*xfer_data)(audio_stream* stream, uint32_t buffer, char* mem_buff, uint32_t offset);
-        // set audio status of a device; returns new audio status
-        audio_status (*set_device_status)(audio_device* device, audio_status status);
-        // set volume of stream
-        void (*adjust_volume)(audio_stream* stream, uint8_t volume);
-        // set sample rate of stream; returns new sample rate
-        int (*set_sample_rate)(audio_stream* stream, int sample_rate);
-        // get streams playback position
-        void (*get_playback_position)(audio_stream* stream, audio_position* pos);
-        // set number of channels in device; returns number of channels used after switch
-        int (*set_num_channels)(audio_device* device, int channels);
-    } audio_driver;
-
     // called by a driver whenever a buffer is finished (played or recorded through)
     void audio_buffer_complete(audio_stream* stream, uint32_t buffer);
 

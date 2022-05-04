@@ -1,7 +1,7 @@
 #include "audio.h"
 #include "debug.h"
 
-static audio_driver* driver;
+typedef struct audio_driver* driver;
 
 // update interrupt status
 using namespace audio;
@@ -280,3 +280,70 @@ static void init_widget(hda_audio_device* device, int codec, int node_id) {
     }
 }
 
+// Enumerates and initializes widgets for the codec. Returns 0 on successly initializing at least one widget, -1 on failure.
+static int codec_init_widgets(hda_audio_device* device, int codec) {
+    uint32_t parameter = codec_transmission(device, codec, 0, VERB_GET_PARAMETER | PARAM_NODE_COUNT);
+    int num_func_groups, num_widgets;
+    num_func_groups = parameter & 0xFF;
+    int func_group_start, widget_start;
+    func_group_start = (parameter >> 16) & 0xFF;
+
+    for (int i = 0; i < num_func_groups; i++) {
+        parameter = codec_transmission(device, codec, func_group_start + i, VERB_GET_PARAMETER | PARAM_NODE_COUNT);
+        num_widgets = parameter & 0xFF;
+        widget_start = (parameter >> 16) & 0xFF;
+        parameter = codec_transmission(device, codec, func_group_start + i, VERB_GET_PARAMETER | PARAM_FN_GROUP_TYPE) & 0x7F;
+        if (parameter != GROUP_AUDIO) {
+            continue;
+        }
+        codec_transmission(device, codec, func_group_start + i, VERB_SET_POWER_STATE | 0x0);
+        for (int j = 0; j < num_widgets; j++) {
+            init_widget(device, codec, widget_start + j);
+        }
+    }
+    return device->output->node_id ? 0 : -1;
+}
+
+// Picks the first available output widget to use as our output codec. If we structure this better, we can have multiple outputs,
+// but since we didn't structure this to use an audio device on a bus provided by the PCI, we can't. We are now simply using the PCI slot for one device.
+static void audio_init_codec(hda_audio_device* device) {
+    uint16_t state_status = REG_INW(device, REG_STATESTS);
+    for (int i = 0; i < 15; i++) {
+        if (state_status & (1 << i)) {
+            if (codec_init_widgets(device, i)) {
+                return;
+            }
+        }
+    }
+}
+
+static void audio_reset(hda_audio_device* device) {
+    // clear registers and ring buffers
+    REG_OUTL(device, REG_CORBCTL, 0);
+    REG_OUTL(device, REG_RIRBCTL, 0);
+    // wait for the corb and rirb buffers to stop running
+    while (REG_INL(device, REG_CORBCTL) & CORBCTL_CORBRUN || REG_INL(device, REG_RIRBCTL) & RIRBCTL_RIRBRUN);
+    // may need some delay here
+    // reset hardware
+    REG_OUTL(device, REG_GCTL, 0);
+    while (REG_INL(device, REG_GCTL) & GCTL_RESET);
+    REG_OUTL(device, REG_GCTL, GCTL_RESET);
+    while ((REG_INL(device, REG_GCTL) & GCTL_RESET) == 0);
+    // clear interrupts
+    REG_OUTW(device, REG_WAKEEN, 0xFFFF);
+    REG_OUTL(device, REG_INTCTL, 0x800000FF);
+
+    // restart audio - set up buffers again
+    init_corb(device);
+    init_rirb(device);
+
+    // may need some delay here? might have to use jiffies in pit.h
+    audio_init_codec(device);
+}
+
+
+
+
+static struct audio_driver* driver = {
+
+};
