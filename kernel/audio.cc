@@ -111,16 +111,34 @@ static void corb_write(hda_audio_device* device, uint32_t verb) {
 
 static void rirb_read(hda_audio_device* device, uint64_t* read){
     uint16_t write_pointer;
+    // last accessed read_pointer read from RIRB
     uint16_t read_pointer = device->rirb_rp;
 
+    // do while searches for an entry in RIRB
     do {
         write_pointer = REG_INW(device, REG_RIRBWP) & 0xFF;
     } while (write_pointer == read_pointer);
 
+    // go to next unread read pointer in RIRB to read
     read_pointer = (read_pointer + 1) % device->rirb_entries;
     device->rirb_rp = read_pointer;
+
+    // read from RIRB into uint64_t ptr
     *read = device->rirb[read_pointer];
     REG_OUTB(device, REG_RIRBSTS, 0x5);
+}
 
+static uint32_t codec_transmission(hda_audio_device* device, int codec, int widget_id, uint32_t payload){
+    uint64_t read;
+    // Generate corb input with codec, widget id, and payload
+    uint32_t verb = ((codec & 0xf) << 28) |
+                    ((widget_id & 0xff) << 20) |
+                    (payload & 0xfffff);
 
+    // write to corb with generated input
+    corb_write(device, verb);
+    // read from rirb; should be able receive communication from corb
+    rirb_read(device, &read);
+
+    return read & 0xffffffff;
 }
