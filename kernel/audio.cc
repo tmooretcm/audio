@@ -419,3 +419,13 @@ static int audio_set_chnl_ct(audio_device dev, int channels) {
 
     return channels;
 }
+
+static void get_audio_pos(audio_stream* stream, audio_position* pos) {
+    
+    hda_audio_device* hda = (hda_audio_device*)stream->device;
+    uint32_t position = hda->dma_pos[4] & 0xffffffff;
+
+    pos->buffer = position / BUFFER_SIZE;
+    pos->frame = (position % BUFFER_SIZE) / 2;
+
+}
