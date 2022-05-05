@@ -6,7 +6,6 @@
 #include "config.h"
 #include "vmm.h"
 
-typedef struct audio_driver* driver;
 
 // update interrupt status
 using namespace audio;
@@ -377,48 +376,6 @@ void stream_descriptor_init(hda_audio_device* device) {
     REG_OUTL(device, REG_DPUBASE, (uint32_t)((uint64_t)dma_pos >> 32));
 }
 
-/* not sure what to do w this
-static struct audio_driver* driver = {
-
-};
-*/
-
-static struct audio_device* init_dev(PCI::pci_device* device) {
-
-    PCI::pci_device* pci = device;
-    hda_audio_device* hda;
-
-    hda = (hda_audio_device*)malloc(sizeof(hda_audio_device));
-    hda->rings = new mem_area();
-    hda->rings->pa = PhysMem::alloc_frame() | 7;
-    hda->rings->va = (void*) 0xFEC01000;
-    gheith::map(gheith::current()->pd, hda->rings->va, hda->rings->pa);
-    hda->corb = (uint32_t*) ((uintptr_t) hda->rings->va + 0);
-    hda->rirb = (uint32_t*) ((uintptr_t) hda->rings->va + 1024);
-    hda->bdl = (audio_bdl_entry*) ((uintptr_t) hda->rings->va + 3072);
-    hda->dma_pos = (uint32_t*) ((uintptr_t) hda->rings->va + 3072 ROUNDED_BDL_BYTES);
-
-    if(hda->rings == nullptr) {
-        PhysMem::dealloc_frame(hda->rings);
-        free(hda);
-        return nullptr;
-    }
-    hda->mmio->pa = PhysMem::alloc_frame();
-    hda->completed_buffers = malloc(4096);
-    if(hda->completed_buffers == nullptr) return nullptr;
-
-    hda->mmio->pa = PhysMem::alloc_frame();
-
-    audio_reset(hda);
-    init_output_widget(hda);
-    stream_descriptor_init(hda);
-
-    hda->audio->recorder = 0;
-    //hda->audio->streams = 
-
-    return &hda->audio;    
-}
-
 void audio_set_volume(audio_stream* stream, uint8_t volume) {
 
     hda_audio_device* hda = (hda_audio_device*) stream->device;
@@ -471,4 +428,49 @@ void get_audio_pos(audio_stream* stream, audio_position* pos) {
     pos->buffer = position / BUFFER_SIZE;
     pos->frame = (position % BUFFER_SIZE) / 2;
 
+}
+
+static PCI::pci_device* init_dev(PCI::pci_device* device) {
+    hda_audio_device* hda;
+
+    hda = (hda_audio_device*)malloc(sizeof(hda_audio_device));
+    hda->rings = new mem_area();
+    hda->rings->pa = (uint32_t*)(PhysMem::alloc_frame() | 7);
+    hda->rings->va = (void*) 0xFEC01000;
+    gheith::map(gheith::current()->pd, (uint32_t)hda->rings->va, (uint32_t)hda->rings->pa);
+    hda->corb = (uint32_t*) ((uintptr_t) hda->rings->va + 0);
+    hda->rirb = (uint32_t*) ((uintptr_t) hda->rings->va + 1024);
+    hda->bdl = (audio_bdl_entry*) ((uintptr_t) hda->rings->va + 3072);
+    hda->dma_pos = (uint32_t*) ((uintptr_t) hda->rings->va + 3072 + ROUNDED_BDL_BYTES);
+
+    if(hda->rings == nullptr) {
+        PhysMem::dealloc_frame((uint32_t)hda->rings->pa);
+        free(hda);
+        return nullptr;
+    }
+    hda->completed_buffers = (mem_area*)malloc(4096);
+    if(hda->completed_buffers == nullptr) return nullptr;
+
+    hda->mmio->pa = (uint32_t*)PhysMem::alloc_frame();
+    hda->mmio->va = (void*) 0xFED01000;
+    gheith::map(gheith::current()->pd, (uint32_t)hda->mmio->va, (uint32_t)hda->mmio->pa);
+
+    audio_reset(hda);
+    init_output_widget(hda);
+    stream_descriptor_init(hda);
+
+    hda->audio->recorder = 0;
+    hda->audio->streams = new audio_stream*[8];
+
+    for (int i = 0; i < 8; i++) {
+        audio_set_volume(hda->output->stream, 255);
+    }
+
+    return hda->audio->device;    
+}
+
+int main (int argc, char** argv) {
+    PCI::pci_device* dev = new PCI::pci_device();
+    init_dev(dev);
+    return 0;
 }
