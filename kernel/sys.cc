@@ -384,6 +384,10 @@ extern "C" int sysHandler(uint32_t eax, uint32_t *frame) {
             my_pcb->fd[fnum]->offset = off;
             return off;
         }
+        case 14: // play
+        {
+            
+        }
         default:
         {
             return -1;

@@ -4,5 +4,6 @@ void one(int fd) {
 }
 
 int main(int argc, char** argv) {
-    shutdown();
+    int fd = open("/carti.wav",0);
+    
 }
