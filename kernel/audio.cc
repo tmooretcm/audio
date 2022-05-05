@@ -7,7 +7,7 @@ typedef struct audio_driver* driver;
 using namespace audio;
 
 // Handles any interrupts - not technically needed to implement audio but since we have interrupts enabled we must have this
-static void handle_interrupt(hda_audio_device* device) {
+void handle_interrupt(hda_audio_device* device) {
     // Grab current values
     uint32_t curr_int_sts = REG_INL(device, REG_INTSTS);
     uint8_t curr_out_sts = REG_INB(device, REG_O0_STS);
@@ -16,7 +16,7 @@ static void handle_interrupt(hda_audio_device* device) {
 
     // Interrupt for stream 1 = buffer finished
     if (curr_out_sts & 0x4) {
-        audio_buffer_complete(device->output->stream, device->num_buffs_completed);
+        //audio_buffer_complete(device->output->stream, device->num_buffs_completed); Method not defined anywhere??
         device->num_buffs_completed++;
         device->num_buffs_completed %= BDL_SIZE;
     }
@@ -52,7 +52,7 @@ static void init_corb(hda_audio_device* device) {
     // initialize corb base address
     corb_base_addr = (uintptr_t)device->rings->pa[0];
     REG_OUTL(device, REG_CORBLBASE, corb_base_addr & 0xFFFFFFFF);
-    REG_OUTL(device, REG_CORBUBASE, corb_base_addr >> 32);
+    REG_OUTL(device, REG_CORBUBASE, (uint32_t)((uint64_t)corb_base_addr >> 32));
 
     // start DMA
     REG_OUTB(device, REG_CORBCTL, 0x02);
@@ -82,7 +82,7 @@ static void init_rirb(hda_audio_device* device) {
 
     rirb_base_addr = (uintptr_t)device->rings->pa[0] + 1024; // should be pa[256] (?)
     REG_OUTL(device, REG_RIRBLBASE, rirb_base_addr & 0xFFFFFFFF);
-    REG_OUTL(device, REG_RIRBUBASE, rirb_base_addr >> 32);
+    REG_OUTL(device, REG_RIRBUBASE, (uint32_t)((uint64_t)rirb_base_addr >> 32));
 
     // set interrupt cnt register
     REG_OUTB(device, REG_RINTCNT, 0x42);
@@ -161,7 +161,7 @@ static void output_widget_config(hda_audio_device* device){
 
 }
 
-static void init_output_widget(hda_audio_device* device){
+void init_output_widget(hda_audio_device* device){
     device->output->stream->device = device->audio;
     device->output->stream->num_buffers = BDL_SIZE;
     device->output->stream->buffer_size = BUFFER_SIZE / 2;
@@ -182,7 +182,7 @@ static void debug_widget_connections(hda_audio_device* device, int codec, int no
         return;
     }
     uint32_t selected_connection;
-    for (int i = 0; i < (num_connections & 0x7F); i++) {
+    for (uint32_t i = 0; i < (num_connections & 0x7F); i++) {
         uint32_t current_connection;
         int index, shift;
         if (num_connections & 0x80) {
@@ -225,7 +225,7 @@ static void init_widget(hda_audio_device* device, int codec, int node_id) {
     amp_capability = codec_transmission(device, codec, node_id, VERB_GET_PARAMETER | PARAM_OUT_AMP_CAP);
     eapd_capability = codec_transmission(device, codec, node_id, VERB_GET_EAPD_BTL);
 
-    char* widget_name;
+    const char* widget_name;
     switch (type) {
         case 0: widget_name = "WIDGET: Output"; break;
         case 1: widget_name = "WIDGET: Input"; break;
@@ -317,7 +317,7 @@ static void audio_init_codec(hda_audio_device* device) {
     }
 }
 
-static void audio_reset(hda_audio_device* device) {
+void audio_reset(hda_audio_device* device) {
     // clear registers and ring buffers
     REG_OUTL(device, REG_CORBCTL, 0);
     REG_OUTL(device, REG_RIRBCTL, 0);
@@ -341,7 +341,7 @@ static void audio_reset(hda_audio_device* device) {
     audio_init_codec(device);
 }
 
-static void stream_descriptor_init(hda_audio_device* device) {
+void stream_descriptor_init(hda_audio_device* device) {
     uint32_t bld_b, dma_pos;
     int i;
 
@@ -353,14 +353,14 @@ static void stream_descriptor_init(hda_audio_device* device) {
     // Set buffer list 
     bld_b = (uintptr_t) device->rings->pa[0] + 3072;
     REG_OUTL(device, REG_O0_BDLPL, bld_b & 0xFFFFFFFF);
-    REG_OUTL(device, REG_O0_BDLPU, bld_b >> 32);
+    REG_OUTL(device, REG_O0_BDLPU, (uint32_t)((uint64_t)bld_b >> 32));
 
     for(i = 0; i < BDL_SIZE; i++) {
         device->bdl[i].addr = device->completed_buffers->pa[0] + (i * BUFFER_SIZE);
         device->bdl[i].length = BUFFER_SIZE;
         device->bdl[i].flags = 1;
     }
-    memset(device->completed_buffers->va, 0, BDL_SIZE * BUFFER_SIZE);
+    //memset(device->completed_buffers->va, 0, BDL_SIZE * BUFFER_SIZE); from "string.h" but causes problems so commented out temporarily
 
     // init DMA pos in buffer
     for(i = 0; i < 8; i++) {
@@ -369,21 +369,23 @@ static void stream_descriptor_init(hda_audio_device* device) {
 
     dma_pos = (uintptr_t) device->rings->pa[0] + 3072 + ROUNDED_BDL_BYTES;
     REG_OUTL(device, REG_DPLBASE, (dma_pos & 0xffffffff) | 0x1); // marked as TODO needs another look
-    REG_OUTL(device, REG_DPUBASE, dma_pos >> 32);
+    REG_OUTL(device, REG_DPUBASE, (uint32_t)((uint64_t)dma_pos >> 32));
 }
 
+/* not sure what to do w this
 static struct audio_driver* driver = {
 
 };
+*/
 
-static void audio_set_volume(audio_stream* stream, uint8_t volume) {
+void audio_set_volume(audio_stream* stream, uint8_t volume) {
 
     hda_audio_device* hda = (hda_audio_device*) stream->device;
     int meta = 0xB000; // output amp
 
     if(volume == 0) {
         //set mute bit
-        volume = 0x80
+        volume = 0x80;
     } else {
         // scale volume to amp_gain
         volume = volume * hda->output->amp_gain / 255;
@@ -391,7 +393,7 @@ static void audio_set_volume(audio_stream* stream, uint8_t volume) {
     codec_transmission(hda, hda->output->codec, hda->output->node_id, VERB_SET_AMP_GAIN_MUTE | meta | volume);  
 }
 
-static int audio_set_sample_rate(audio_stream* stream, int sr) {
+int audio_set_sample_rate(audio_stream* stream, int sr) {
 
     hda_audio_device* hda = (hda_audio_device*) stream->device;
 
@@ -408,7 +410,7 @@ static int audio_set_sample_rate(audio_stream* stream, int sr) {
     return sr;  
 }
 
-static int audio_set_chnl_ct(audio_device* dev, int channels) {
+int audio_set_chnl_ct(audio_device* dev, int channels) {
     hda_audio_device* hda = (hda_audio_device*) dev->device;
     if(channels < 1 || channels > 2) {
         channels = 2;
@@ -420,7 +422,7 @@ static int audio_set_chnl_ct(audio_device* dev, int channels) {
     return channels;
 }
 
-static void get_audio_pos(audio_stream* stream, audio_position* pos) {
+void get_audio_pos(audio_stream* stream, audio_position* pos) {
     
     hda_audio_device* hda = (hda_audio_device*)stream->device;
     uint32_t position = hda->dma_pos[4] & 0xffffffff;

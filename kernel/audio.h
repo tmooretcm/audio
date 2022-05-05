@@ -2,7 +2,6 @@
 #define _audio_h_
 
 #include "pci.h"
-#include "string.h"
 
 #define BDL_SIZE 4
 #define BUFFER_SIZE 0x10000
@@ -246,6 +245,16 @@ namespace audio {
         BITS_32                 = (4 <<  4),
         BITS_16                 = (1 <<  4),
     };
+
+    extern void handle_interrupt(hda_audio_device* device);
+    extern void get_audio_pos(audio_stream* stream, audio_position* pos);
+    extern int audio_set_chnl_ct(audio_device* dev, int channels);
+    extern int audio_set_sample_rate(audio_stream* stream, int sr);
+    extern void audio_set_volume(audio_stream* stream, uint8_t volume);
+    extern void stream_descriptor_init(hda_audio_device* device);
+    extern void audio_reset(hda_audio_device* device);
+    extern void init_output_widget(hda_audio_device* device);
 }
+
 
 #endif
