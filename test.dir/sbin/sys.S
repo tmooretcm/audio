@@ -113,7 +113,7 @@ seek:
 	int $48
 	ret
 
-	# int play(int fd)
+	# int play(int fd ... --)
 	.global play
 play:
 	mov $13, %eax
