@@ -372,8 +372,50 @@ static void stream_descriptor_init(hda_audio_device* device) {
     REG_OUTL(device, REG_DPUBASE, dma_pos >> 32);
 }
 
-
-
 static struct audio_driver* driver = {
 
 };
+
+static void audio_set_volume(audio_stream* stream, uint8_t volume) {
+
+    hda_audio_device* hda = (hda_audio_device*) stream->device;
+    int meta = 0xB000; // output amp
+
+    if(volume == 0) {
+        //set mute bit
+        volume = 0x80
+    } else {
+        // scale volume to amp_gain
+        volume = volume * hda->output->amp_gain / 255;
+    }
+    codec_transmission(hda, hda->output->codec, hda->output->node_id, VERB_SET_AMP_GAIN_MUTE | meta | volume);  
+}
+
+static int audio_set_sample_rate(audio_stream* stream, int sr) {
+
+    hda_audio_device* hda = (hda_audio_device*) stream->device;
+
+    switch(sr) {
+        case 44100:
+            hda->output->sample_rate = SR_44_KHZ;
+            break;
+        default:
+            sr = 48000;
+            hda->output->sample_rate = SR_48_KHZ;
+            break;
+    }
+    output_widget_config(hda);
+    return sr;  
+}
+
+static int audio_set_chnl_ct(audio_device dev, int channels) {
+    hda_audio_device* hda = (hda_audio_device*) dev;
+    if(channels < 1 || channels > 2) {
+        channels = 2;
+    }
+
+    hda->output->num_channels = channels;
+    output_widget_config(hda);
+
+    return channels;
+}
