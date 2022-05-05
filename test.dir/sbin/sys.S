@@ -116,7 +116,7 @@ seek:
 	# int play(int fd ... --)
 	.global play
 play:
-	mov $13, %eax
+	mov $14, %eax
 	int $48
 	ret
 
