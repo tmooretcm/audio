@@ -351,14 +351,14 @@ static void stream_descriptor_init(hda_audio_device* device) {
     REG_OUTW(device, REG_O0_STLVI, BDL_SIZE -1);
 
     // Set buffer list 
-    bdl_b = (uintptr_t) device->rings->pa[0] + 3072;
-    REG_OUTL(device, REG_O0_BDLPL, bdl_b & 0xFFFFFFFF);
+    bld_b = (uintptr_t) device->rings->pa[0] + 3072;
+    REG_OUTL(device, REG_O0_BDLPL, bld_b & 0xFFFFFFFF);
     REG_OUTL(device, REG_O0_BDLPU, bld_b >> 32);
 
     for(i = 0; i < BDL_SIZE; i++) {
         device->bdl[i].addr = device->completed_buffers->pa[0] + (i * BUFFER_SIZE);
-        device->bdl[i]->length = BUFFER_SIZE;
-        device->bdl[i]->flags = 1;
+        device->bdl[i].length = BUFFER_SIZE;
+        device->bdl[i].flags = 1;
     }
     memset(device->completed_buffers->va, 0, BDL_SIZE * BUFFER_SIZE);
 
@@ -408,8 +408,8 @@ static int audio_set_sample_rate(audio_stream* stream, int sr) {
     return sr;  
 }
 
-static int audio_set_chnl_ct(audio_device dev, int channels) {
-    hda_audio_device* hda = (hda_audio_device*) dev;
+static int audio_set_chnl_ct(audio_device* dev, int channels) {
+    hda_audio_device* hda = (hda_audio_device*) dev->device;
     if(channels < 1 || channels > 2) {
         channels = 2;
     }

@@ -2,6 +2,7 @@
 #define _audio_h_
 
 #include "pci.h"
+#include "string.h"
 
 #define BDL_SIZE 4
 #define BUFFER_SIZE 0x10000
