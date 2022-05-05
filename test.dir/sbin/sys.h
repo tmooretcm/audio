@@ -78,4 +78,9 @@ extern int fork();
 /* a nullptr indicates end of arguments */
 extern int execl(const char* path, const char* arg0, ...);
 
+/* play */
+/* takes in file descriptor fd */
+/* plays file from start to finish */
+extern int play(int fd);
+
 #endif

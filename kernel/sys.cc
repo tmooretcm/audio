@@ -386,7 +386,8 @@ extern "C" int sysHandler(uint32_t eax, uint32_t *frame) {
         }
         case 14: // play
         {
-            
+            uint32_t fd = user_esp[1];
+            auto file = my_pcb->fd[fd];
         }
         default:
         {
