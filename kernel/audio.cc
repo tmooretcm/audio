@@ -1,5 +1,10 @@
 #include "audio.h"
 #include "debug.h"
+#include "bus.h"
+#include "pci.h"
+#include "physmem.h"
+#include "config.h"
+#include "vmm.h"
 
 typedef struct audio_driver* driver;
 
@@ -377,6 +382,42 @@ static struct audio_driver* driver = {
 
 };
 */
+
+static struct audio_device* init_dev(PCI::pci_device* device) {
+
+    PCI::pci_device* pci = device;
+    hda_audio_device* hda;
+
+    hda = (hda_audio_device*)malloc(sizeof(hda_audio_device));
+    hda->rings = new mem_area();
+    hda->rings->pa = PhysMem::alloc_frame() | 7;
+    hda->rings->va = (void*) 0xFEC01000;
+    gheith::map(gheith::current()->pd, hda->rings->va, hda->rings->pa);
+    hda->corb = (uint32_t*) ((uintptr_t) hda->rings->va + 0);
+    hda->rirb = (uint32_t*) ((uintptr_t) hda->rings->va + 1024);
+    hda->bdl = (audio_bdl_entry*) ((uintptr_t) hda->rings->va + 3072);
+    hda->dma_pos = (uint32_t*) ((uintptr_t) hda->rings->va + 3072 ROUNDED_BDL_BYTES);
+
+    if(hda->rings == nullptr) {
+        PhysMem::dealloc_frame(hda->rings);
+        free(hda);
+        return nullptr;
+    }
+    hda->mmio->pa = PhysMem::alloc_frame();
+    hda->completed_buffers = malloc(4096);
+    if(hda->completed_buffers == nullptr) return nullptr;
+
+    hda->mmio->pa = PhysMem::alloc_frame();
+
+    audio_reset(hda);
+    init_output_widget(hda);
+    stream_descriptor_init(hda);
+
+    hda->audio->recorder = 0;
+    //hda->audio->streams = 
+
+    return &hda->audio;    
+}
 
 void audio_set_volume(audio_stream* stream, uint8_t volume) {
 
