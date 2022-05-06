@@ -8,6 +8,8 @@
 #define ROUNDED_BDL_BYTES ((BDL_SIZE * sizeof(struct audio_bdl_entry) + 127) & ~127)
 #define BUFFER_SAMPLES (BUFFER_SIZE / 2)
 
+extern PCI::pci_device* init_dev(PCI::pci_device* device);
+
 namespace audio {
 
     // HDA Memory Mapped Registers
@@ -132,7 +134,7 @@ namespace audio {
         mem_area* rings; // Memory space for each ring buffer
         uint32_t* corb; // corb buffer
         volatile uint32_t* rirb; // rirb buffer
-        audio_bdl_entry* bdl; // buffer descriptor list
+        audio_bdl_entry** bdl; // buffer descriptor list
         volatile uint32_t* dma_pos; // dma position in buffer
 
         uint32_t corb_entries;

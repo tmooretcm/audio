@@ -13,6 +13,8 @@
 #include "vmm.h"
 #include "physmem.h"
 #include "process.h"
+#include "pci.h"
+#include "audio.h"
 
 extern "C" int sysHandler(uint32_t eax, uint32_t *frame) {
     auto me = gheith::current();
@@ -388,6 +390,9 @@ extern "C" int sysHandler(uint32_t eax, uint32_t *frame) {
         {
             uint32_t fd = user_esp[1];
             auto file = my_pcb->fd[fd];
+            PCI::pci_device* dev = new PCI::pci_device();
+            init_dev(dev);
+
         }
         default:
         {

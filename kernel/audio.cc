@@ -34,7 +34,7 @@ void handle_interrupt(hda_audio_device* device) {
 static void init_corb(hda_audio_device* device) {
     uint8_t reg;
     uint32_t corb_base_addr;
-
+    REG_OUTB(device, REG_CORBSIZE, 255);
     reg = REG_INB(device, REG_CORBSIZE);
 
     // checking corb sizes
@@ -66,7 +66,7 @@ static void init_corb(hda_audio_device* device) {
 static void init_rirb(hda_audio_device* device) {
     uint8_t reg;
     uint32_t rirb_base_addr;
-
+    REG_OUTB(device, REG_RIRBSIZE, 255);
     reg = REG_INB(device, REG_RIRBSIZE);
 
     if (reg & (1 << 6)) {
@@ -135,7 +135,7 @@ static void rirb_read(hda_audio_device* device, uint64_t* read){
     REG_OUTB(device, REG_RIRBSTS, 0x5);
 }
 
-// Facilitates communication between corb and rirb. codex, widget, and payload
+// Facilitates communication between corb and rirb. codec, widget, and payload
 // parameters define the communication. Using these instructions, write to corb, then
 // read from rirb and return the response.
 static uint32_t codec_transmission(hda_audio_device* device, int codec, int widget_id, uint32_t payload){
@@ -166,12 +166,14 @@ static void output_widget_config(hda_audio_device* device){
 }
 
 void init_output_widget(hda_audio_device* device){
+    device->output = new hda_audio_output();
+    device->output->stream = new audio_stream();
     device->output->stream->device = device->audio;
     device->output->stream->num_buffers = BDL_SIZE;
     device->output->stream->buffer_size = BUFFER_SIZE / 2;
     device->output->stream->sample_format = AUDIO_16SI;
 
-
+    
     codec_transmission(device, device->output->codec, device->output->node_id, VERB_SET_STREAM_CHANNEL | 0x10);
 
     device->output->sample_rate = SR_48_KHZ;
@@ -353,17 +355,17 @@ void stream_descriptor_init(hda_audio_device* device) {
     REG_OUTB(device, REG_O0_CTLU, 0x10);
     REG_OUTL(device, REG_O0_CBL, BDL_SIZE * BUFFER_SIZE);
     REG_OUTW(device, REG_O0_STLVI, BDL_SIZE -1);
-
+    
     // Set buffer list 
     bld_b = (uintptr_t) device->rings->pa[0] + 3072;
     REG_OUTL(device, REG_O0_BDLPL, bld_b & 0xFFFFFFFF);
     REG_OUTL(device, REG_O0_BDLPU, (uint32_t)((uint64_t)bld_b >> 32));
-
     for(i = 0; i < BDL_SIZE; i++) {
-        device->bdl[i].addr = device->completed_buffers->pa[0] + (i * BUFFER_SIZE);
-        device->bdl[i].length = BUFFER_SIZE;
-        device->bdl[i].flags = 1;
+        device->bdl[i]->addr = device->completed_buffers->pa[0] + (i * BUFFER_SIZE);
+        device->bdl[i]->length = BUFFER_SIZE;
+        device->bdl[i]->flags = 1;
     }
+
     //memset(device->completed_buffers->va, 0, BDL_SIZE * BUFFER_SIZE); from "string.h" but causes problems so commented out temporarily
 
     // init DMA pos in buffer
@@ -377,10 +379,9 @@ void stream_descriptor_init(hda_audio_device* device) {
 }
 
 void audio_set_volume(audio_stream* stream, uint8_t volume) {
-
     hda_audio_device* hda = (hda_audio_device*) stream->device;
     int meta = 0xB000; // output amp
-
+    hda->output = new hda_audio_output();
     if(volume == 0) {
         //set mute bit
         volume = 0x80;
@@ -430,7 +431,7 @@ void get_audio_pos(audio_stream* stream, audio_position* pos) {
 
 }
 
-static PCI::pci_device* init_dev(PCI::pci_device* device) {
+PCI::pci_device* init_dev(PCI::pci_device* device) {
     hda_audio_device* hda;
 
     hda = (hda_audio_device*)malloc(sizeof(hda_audio_device));
@@ -440,7 +441,7 @@ static PCI::pci_device* init_dev(PCI::pci_device* device) {
     gheith::map(gheith::current()->pd, (uint32_t)hda->rings->va, (uint32_t)hda->rings->pa);
     hda->corb = (uint32_t*) ((uintptr_t) hda->rings->va + 0);
     hda->rirb = (uint32_t*) ((uintptr_t) hda->rings->va + 1024);
-    hda->bdl = (audio_bdl_entry*) ((uintptr_t) hda->rings->va + 3072);
+    hda->bdl = (audio_bdl_entry**) ((uintptr_t) hda->rings->va + 3072);
     hda->dma_pos = (uint32_t*) ((uintptr_t) hda->rings->va + 3072 + ROUNDED_BDL_BYTES);
 
     if(hda->rings == nullptr) {
@@ -448,23 +449,26 @@ static PCI::pci_device* init_dev(PCI::pci_device* device) {
         free(hda);
         return nullptr;
     }
-    hda->completed_buffers = (mem_area*)malloc(4096);
+    hda->completed_buffers = new mem_area();
     if(hda->completed_buffers == nullptr) return nullptr;
-
+    hda->mmio = new mem_area();
     hda->mmio->pa = (uint32_t*)PhysMem::alloc_frame();
     hda->mmio->va = (void*) 0xFED01000;
     gheith::map(gheith::current()->pd, (uint32_t)hda->mmio->va, (uint32_t)hda->mmio->pa);
 
+    
     audio_reset(hda);
     init_output_widget(hda);
     stream_descriptor_init(hda);
 
+    hda->audio = new audio_device();
     hda->audio->recorder = 0;
     hda->audio->streams = new audio_stream*[8];
 
-    for (int i = 0; i < 8; i++) {
-        audio_set_volume(hda->output->stream, 255);
-    }
+    hda->output = new hda_audio_output();
+    hda->output->stream = new audio_stream();
+    hda->output->stream->device = new audio_device();
+    audio_set_volume(hda->output->stream, 255);
 
     return hda->audio->device;    
 }
