@@ -1,3 +1,8 @@
+// REFERENCES: 
+// https://wiki.osdev.org/Intel_High_Definition_Audio
+// https://www.intel.com/content/www/us/en/standards/high-definition-audio-specification.html
+// https://github.com/qemu/qemu/blob/master/hw/audio/intel-hda.c - as a reference to help get started
+// https://github.com/qemu/qemu/blob/master/hw/audio/intel-hda.h - as a reference to help get started
 #ifndef _audio_h_
 #define _audio_h_
 
